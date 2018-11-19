@@ -100,17 +100,26 @@ const fetchedVersion: Observable<RequestResponse<{}>> = request(
   }
 ).retry(4);
 
-export const compare: Observable<string> = Observable.timer(
-  0,
-  CHECK_DELAY
-).switchMap(() =>
-  Observable.combineLatest(filteredDismissedVersion, fetchedVersion)
-    .filter(values => {
-      const filteredDismissedVersion = values[0];
-      const newVersion = getVersionFromVersionObject(values[1]);
+export function compareStream(
+  delay: number,
+  dismissedVersion: Observable<string>,
+  newFetchedVersion: Observable<any>
+): Observable<string> {
+  return Observable.timer(0, delay)
+    .switchMap(() =>
+      Observable.combineLatest(dismissedVersion, newFetchedVersion)
+    )
+    .filter(([dismissed, nextVersion]) => {
+      const newVersion = getVersionFromVersionObject(nextVersion);
       setInLocalStorage(LAST_TIME_CHECK, new Date().getTime());
 
-      return compareVersions(newVersion, filteredDismissedVersion) === 1;
+      return compareVersions(newVersion, dismissed) === 1;
     })
-    .map(values => getVersionFromVersionObject(values[1]))
+    .map(([, nextVersion]) => getVersionFromVersionObject(nextVersion));
+}
+
+export const compare = compareStream(
+  CHECK_DELAY,
+  filteredDismissedVersion,
+  fetchedVersion
 );
